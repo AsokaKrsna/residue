@@ -1,0 +1,30 @@
+# dependencies and build output
+node_modules
+dist
+dist-offline
+coverage
+*.tsbuildinfo
+
+# local AI workspace and notes (never publish)
+CLAUDE.md
+LLM-Workspace/
+.claude/
+
+# env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# logs
+*.log
+npm-debug.log*
+
+# editor and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+.wrangler/
