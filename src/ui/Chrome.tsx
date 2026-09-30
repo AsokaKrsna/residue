@@ -184,6 +184,7 @@ export function StatusBar() {
       )}
       <span class="grow" />
       <span class={reqs ? "warn" : "ok"} title="Requests to any other website since the page loaded. The content security policy blocks them, and your text is never sent anywhere.">requests to other sites: {reqs}</span>
+      <a class="credit" href="https://www.linkedin.com/in/durjoy-majumdar/" target="_blank" rel="noopener noreferrer" title="Made by Durjoy Majumdar">Durjoy Majumdar | AsokaKrsna</a>
     </footer>
   );
 }

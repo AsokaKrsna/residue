@@ -6,7 +6,7 @@ residue is a private text cleaner for people who draft with AI tools. It finds h
 
 It runs in your browser. Your text stays on your device.
 
-**[Open residue](https://residue.pages.dev/)** · **[Download the offline version](https://residue.pages.dev/residue-offline.html)**
+**[Open residue](https://residue.pages.dev/)** · **[Download the offline version](https://residue.pages.dev/residue-offline)**
 
 ---
 
@@ -122,15 +122,15 @@ The file-writing tools of some editors turn `\uXXXX` escapes into raw characters
 
 ### Deployment
 
-The site is hosted on Cloudflare Workers as static files. `wrangler.jsonc` tells Cloudflare to serve the `dist/` folder. There is no server code. Cloudflare builds and deploys on every push to `main`. GitHub Actions (`.github/workflows/ci.yml`) runs the tests and both builds on every push and pull request.
+The site is hosted on Cloudflare Pages as static files. There is no server code. Cloudflare builds and deploys on every push to `main`. GitHub Actions (`.github/workflows/ci.yml`) runs the tests and both builds on every push and pull request.
 
-Cloudflare build settings (Workers, Settings, Build):
+Cloudflare Pages build settings:
 
 - Build command: `npm run build:site`
-- Deploy command: `npx wrangler deploy`
-- Build variables: `NODE_VERSION=22`, plus the optional support settings from `.env.example`
+- Output directory: `dist`
+- Environment variables: `NODE_VERSION=22`, plus the optional support settings from `.env.example`
 
-The support panel is optional. Copy `.env.example` to `.env` for local use, or add the same names as build variables in Cloudflare. Without them the panel stays hidden.
+The support panel is optional. Copy `.env.example` to `.env` for local use, or set the same variables in Cloudflare. Without them the panel stays hidden.
 
 ## Sources and credits
 
@@ -138,6 +138,10 @@ The support panel is optional. Copy `.env.example` to `.env` for local use, or a
 - Pattern catalogue: Wikipedia, [Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), and [blader/humanizer](https://github.com/blader/humanizer) (MIT).
 - Hidden prompts in papers: [Hidden Prompts in Manuscripts Exploit AI-Assisted Peer Review](https://arxiv.org/abs/2507.06185).
 - Built with [Preact](https://preactjs.com), [CodeMirror](https://codemirror.net), [JSZip](https://stuk.github.io/jszip/), [jsdiff](https://github.com/kpdecker/jsdiff) and [idb-keyval](https://github.com/jakearchibald/idb-keyval). Fonts: Geist and Bricolage Grotesque, under the SIL Open Font License.
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

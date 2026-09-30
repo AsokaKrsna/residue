@@ -1,9 +1,0 @@
-// Cloudflare Workers config: serves the built site in dist/ as static files. No server code.
-{
-  "name": "residue",
-  "compatibility_date": "2026-09-30",
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
-}
