@@ -122,15 +122,15 @@ The file-writing tools of some editors turn `\uXXXX` escapes into raw characters
 
 ### Deployment
 
-The site is hosted on Cloudflare Pages, which builds it on every push to `main`. GitHub Actions (`.github/workflows/ci.yml`) runs the tests and both builds on every push and pull request.
+The site is hosted on Cloudflare Workers as static files. `wrangler.jsonc` tells Cloudflare to serve the `dist/` folder. There is no server code. Cloudflare builds and deploys on every push to `main`. GitHub Actions (`.github/workflows/ci.yml`) runs the tests and both builds on every push and pull request.
 
-Cloudflare build settings:
+Cloudflare build settings (Workers, Settings, Build):
 
-- Build command: `npm run build && npm run build:offline && cp dist-offline/residue-offline.html dist/`
-- Output directory: `dist`
-- Environment variables: `NODE_VERSION=22`, plus the optional support settings from `.env.example`
+- Build command: `npm run build:site`
+- Deploy command: `npx wrangler deploy`
+- Build variables: `NODE_VERSION=22`, plus the optional support settings from `.env.example`
 
-The support panel is optional. Copy `.env.example` to `.env` for local use, or set the same variables in Cloudflare. Without them the panel stays hidden.
+The support panel is optional. Copy `.env.example` to `.env` for local use, or add the same names as build variables in Cloudflare. Without them the panel stays hidden.
 
 ## Sources and credits
 
