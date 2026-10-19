@@ -13,7 +13,7 @@ Thank you for wanting to help. Small fixes are as welcome as big ones.
 1. `npm install`
 2. `npm test` and `npm run build` should both pass.
 3. Add a test for any rule you add or change. Include a case where the rule should not fire.
-4. Keep style signals review-only. They should never change text on their own.
+4. Keep style signals review-only. The explicitly tagged four-phrase wording allowlist may be bulk applied only after opt-in and preview. Add no new automatic wording substitutions without dedicated safety tests.
 5. Keep everything in the browser. No network requests and no tracking.
 
 Rules live in `src/engine/rules/`. The README has a short guide under "Adding a rule".

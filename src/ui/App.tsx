@@ -3,7 +3,8 @@ import { EditorPane } from "./EditorPane";
 import { Inspector } from "./Inspector";
 import { RulesPanel } from "./RulesPanel";
 import { StatusBar, Toast, TopBar } from "./Chrome";
-import { openDropped, showRules } from "./store";
+import { openDropped, showRules, legacySaved, restoreSession, forgetSavedDocuments } from "./store";
+import { CleanupPreview } from "./CleanMenu";
 import { SupportPanel, ThanksNudge } from "./Support";
 
 export function App() {
@@ -36,6 +37,11 @@ export function App() {
   return (
     <div class={`app${dropping ? " dropping" : ""}`}>
       <TopBar />
+      {legacySaved.value && <div class="legacy-notice" role="status">
+        Previous documents are saved on this device. They have not been opened. Restoring enables local document storage.
+        <button class="btn small" onClick={() => void restoreSession(true)}>Restore previous documents</button>
+        <button class="btn small" onClick={() => void forgetSavedDocuments()}>Remove saved documents</button>
+      </div>}
       <main class={`main${showRules.value ? "" : " no-rules"}`}>
         {showRules.value ? <RulesPanel /> : <div />}
         <EditorPane />
@@ -45,6 +51,7 @@ export function App() {
       <Toast />
       <ThanksNudge />
       <SupportPanel />
+      <CleanupPreview />
     </div>
   );
 }

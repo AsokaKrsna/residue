@@ -43,7 +43,7 @@ There are more than 80 rules. Each one has its own switch, and every change can 
 | `.tex`, `.bib` | Full editor with LaTeX-aware rules |
 | `.md` | Full editor. Markdown stays Markdown unless you convert it. |
 | `.txt` and other plain text | Full editor. UTF-8, UTF-16 and Windows-1252 are detected. |
-| `.docx` | Fixes are written back into the original Word file. Styles, tables, images and comments stay. Typing is off so paragraphs cannot be merged. |
+| `.docx` | Fixes are written back into the original Word file. Styles, tables, images and comments stay. Typing is off. Structural edits can be refused; verify the saved document in Word. |
 | `.pdf`, `.doc` | Not supported yet |
 
 ## How to use it
@@ -51,7 +51,7 @@ There are more than 80 rules. Each one has its own switch, and every change can 
 1. Open a file, drop one on the page or paste text.
 2. Read the marks. Red is removed, amber is replaced and violet needs your decision. Invisible characters appear as small labels such as `ZWSP`.
 3. Click any mark to see exactly what changes and why.
-4. Press **Clean all** to apply every fix at once. It is a single undo step.
+4. Press **Clean all** to apply the selected technical fixes in one undo step. Its dropdown starts at Moderate, supports category and individual rule choices, and offers optional wording cleanup with a mandatory preview. Review-only suggestions are never bulk accepted except the four explicitly allowlisted wording suggestions.
 5. Go through the violet style signals yourself.
 6. Save. In Chrome and Edge, Save writes back to the file you opened. Other browsers download a copy.
 
@@ -72,15 +72,15 @@ Presets set the rules for common cases: **LaTeX paper**, **Markdown**, **Plain t
 ## Privacy
 
 - All processing happens in your browser tab.
-- The site ships a Content Security Policy with `connect-src 'none'`. The page cannot send data anywhere, and you can confirm this in your browser's developer tools.
-- The status bar counts requests to other sites. It should always read 0.
-- Open documents and settings are saved in this browser only, so your work survives a reload. The menu has an option to clear them.
+- The site ships a Content Security Policy with `connect-src 'none'`. This blocks fetch/XHR/WebSocket connections, including same-origin connections. Processing code is local; inspect browser network traffic to verify a particular build.
+- The status bar shows a limited resource-request indicator. It excludes initial and same-origin loads and is not a complete privacy audit.
+- New installations use session-only documents: save your files before closing. In More, opt in to Remember documents on this device for IndexedDB recovery. Existing saved sessions require an explicit restore/remove choice on upgrade. Theme and preferences may be remembered separately.
 - The offline version is one HTML file that works with no internet at all.
 
 ## Limits
 
 - Style signals are hints, not proof. Human writing triggers them too.
-- Cleaning does not make text "undetectable". Gemini (since 2024) and Claude (since August 2026) watermark text statistically through word choice. No character cleaner can see or remove that.
+- Cleaning does not establish authorship, validate citations, or guarantee a detector score. Character cleanup is different from changing statistical writing patterns.
 - residue does not check whether citations exist. That would need network access. Verify every reference yourself.
 - The LaTeX scanner is fast and forgiving, but it is not a full TeX engine. Unusual macros may need a manual look.
 
@@ -146,3 +146,13 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 [MIT](LICENSE). Copyright 2026 Durjoy Majumdar.
+
+## Selective cleanup and review
+
+Format presets remain separate from bulk selection. Moderate starts each session with conservative technical repairs; optional conversions remain explicit. The dropdown never enables a disabled scan rule. Wording cleanup is off by default and limited to four short phrase substitutions. It protects quotations, scholarly citations, code, math, and links and always shows Before/After before applying. It is not general paraphrasing or a detector predictor.
+
+Changes compares against the opening baseline, including manual edits and edits pasted back from other tools. It lists undo-aware rule operations and actual text differences. Copy passage + editing prompt copies only to your clipboard; links to external writing tools carry no document text. You decide whether to paste into another service.
+
+Word wording edits must fit inside one ordinary XML text node. Edits across runs, links, fields, tracked changes, and protected structure are skipped; unsafe exports stop with an explanation. This is conservative support, not a universal layout-preservation guarantee.
+
+Run `npm run build:site` then `npm run test:browser` for real-browser production/offline checks. Set `RESIDUE_CHROME` if Chrome/Chromium is not in a standard location. See `evaluation/README.md` for synthetic evaluation and optional manual paired-detector logging.

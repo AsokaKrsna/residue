@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "preact/hooks";
+import { RULES_BY_ID } from "../engine/engine";
 import { diffWordsWithSpace } from "diff";
 import { visualize } from "../engine/unicode";
-import { activeDoc, currentText, docVersion, liveFindings, loadSample, mountEditor, newDoc, openDialog, select, selectNext, tally, view$, viewport, selectedId } from "./store";
+import { activeDoc, currentText, docVersion, liveFindings, loadSample, mountEditor, newDoc, openDialog, select, selectNext, tally, view$, viewport, selectedId, appliedRuleCounts, lastRefused } from "./store";
 import { Logo } from "./Chrome";
 
 function Ruler() {
@@ -69,6 +70,11 @@ function Diff() {
   const changed = parts.some((p) => p.added || p.removed);
   return (
     <div class="diff" aria-label="Changes since the file was opened">
+      <div class="change-summary">
+        <p>{parts.filter((p) => p.added).reduce((n, p) => n + p.value.length, 0)} characters inserted; {parts.filter((p) => p.removed).reduce((n, p) => n + p.value.length, 0)} removed. {tally.value.remove + tally.value.replace + tally.value.review} findings remain.</p>
+        <p>Applied rule operations (undo-aware): {Object.entries(appliedRuleCounts.value).map(([id, n]) => `${RULES_BY_ID[id]?.name ?? id}: ${n}`).join("; ") || "none"}. Manual edits appear in the diff too.</p>
+        {lastRefused.value > 0 && <p role="status">Last operation refused {lastRefused.value} edit(s) to protect Word structure.</p>}
+      </div>
       {!changed && <p class="same" style={{ fontFamily: "var(--ui)" }}>No changes since this file was opened.</p>}
       {parts.map((p, i) =>
         p.added ? <ins key={i}>{visualize(p.value)}</ins> : p.removed ? <del key={i}>{visualize(p.value)}</del> : <span class="same" key={i}>{p.value}</span>,
@@ -100,7 +106,7 @@ export function EditorPane() {
         </span>
       </div>
       {d?.docx && (
-        <div class="banner">Word document. Typing is off here so paragraphs and formatting stay intact. Apply fixes with the rules, then Save writes a .docx with every style kept.</div>
+        <div class="banner">Word document. Typing is off. Edits that cross protected structure may be refused. Review the saved file in Word.</div>
       )}
       <div class="ewrap">
         <div class="cm-host" ref={host} style={{ display: v === "edit" ? undefined : "none" }} />

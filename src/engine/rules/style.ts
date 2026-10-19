@@ -44,6 +44,16 @@ const isAdjective = (w: string) => TRIAD_ADJ.has(w.toLowerCase()) || (ADJ_END.te
 
 export const styleRules: Rule[] = [
   rule({
+    id: "sty.concise", group: "sty", bulk: "wording",
+    name: "Optional concise wording",
+    desc: "Four conservative phrase suggestions. Bulk use needs an explicit preview; context still matters.",
+    scope: "text", presets: ALL, fileTypes: ["txt", "md", "tex"],
+    pattern: /\b(?:in order to|due to the fact that|at this point in time|in the event that)\b/gi,
+    fix: () => null,
+    suggest: (m) => [matchCase(m[0], ({ "in order to": "to", "due to the fact that": "because", "at this point in time": "now", "in the event that": "if" } as Record<string, string>)[m[0].toLowerCase()])],
+    note: () => "Check the surrounding claim before accepting. This is not an AI-authorship judgment.",
+  }),
+  rule({
     id: "sty.vocab",
     group: "sty",
     name: "Overused LLM vocabulary",

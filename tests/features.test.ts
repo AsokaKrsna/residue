@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
 import { describe, expect, it } from "vitest";
-import { cleanAll, defaultConfig, scan } from "../src/engine/engine";
+import { cleanAll as cleanSelectedEngine, defaultConfig, scan } from "../src/engine/engine";
 import type { Config, FileType } from "../src/engine/types";
 import { loadDocx, type XmlEnv } from "../src/formats/docx";
 import { decodeBytes } from "../src/formats/decode";
@@ -242,3 +242,9 @@ describe("chat leftovers found in the 2026 research pass", () => {
     expect(ids("Despite these challenges, the town grew.")).toContain("sty.phrase");
   });
 });
+
+// This suite tests explicitly requested conversions, not the Moderate bulk default.
+function cleanAll(...args: Parameters<typeof cleanSelectedEngine>) {
+  const [text, cfg, skips] = args;
+  return cleanSelectedEngine(text, cfg, skips, { ruleIds: Object.keys(cfg.enabled), includeWording: false });
+}

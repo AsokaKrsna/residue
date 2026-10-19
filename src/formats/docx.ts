@@ -23,6 +23,7 @@ interface Segment {
   start: number;
   end: number;
   node: Element | null; // null: a fixed separator
+  wordingSafe?: boolean;
 }
 
 interface Part {
@@ -94,6 +95,7 @@ export function reindex(model: DocxModel): void {
   const sep = (s: string) => { segments.push({ start: text.length, end: text.length + s.length, node: null }); text += s; };
 
   for (const { doc } of model.parts) {
+    let fieldDepth = 0;
     if (text.length) sep("\n\n");
     const paras = Array.from(doc.getElementsByTagNameNS(W, "p"));
     paras.forEach((p, pi) => {
@@ -104,16 +106,26 @@ export function reindex(model: DocxModel): void {
           if (ch.nodeType !== 1) continue;
           const e = ch as Element;
           if (e.namespaceURI === W && e.localName === "p") continue; // nested paragraph (text box): visited on its own
-          if (e.namespaceURI === W && (e.localName === "t" || e.localName === "tab" || e.localName === "br" || e.localName === "cr")) walker.push(e);
+          if (e.namespaceURI === W && (e.localName === "t" || e.localName === "tab" || e.localName === "br" || e.localName === "cr" || e.localName === "fldChar")) walker.push(e);
           else if (!(e.namespaceURI === W && (e.localName === "delText" || e.localName === "instrText"))) collect(e);
         }
       };
       collect(p);
       for (const e of walker) {
         if (closestParagraph(e) !== p) continue;
+        if (e.localName === "fldChar") {
+          const kind = e.getAttributeNS(W, "fldCharType") ?? e.getAttribute("w:fldCharType");
+          if (kind === "begin") fieldDepth++;
+          if (kind === "end") fieldDepth = Math.max(0, fieldDepth - 1);
+          continue;
+        }
         if (e.localName === "t") {
           const t = e.textContent ?? "";
-          segments.push({ start: text.length, end: text.length + t.length, node: e });
+          let sensitive = fieldDepth > 0 || isHiddenRun(e);
+          for (let parent = e.parentNode as Element | null; parent; parent = parent.parentNode as Element | null) {
+            if (["hyperlink", "fldSimple", "ins", "del", "moveFrom", "moveTo", "sdt"].includes(parent.localName)) sensitive = true;
+          }
+          segments.push({ start: text.length, end: text.length + t.length, node: e, wordingSafe: !sensitive });
           if (t && isHiddenRun(e)) hidden.push({ start: text.length, end: text.length + t.length });
           text += t;
         } else sep(e.localName === "tab" ? "\t" : "\n");
@@ -129,6 +141,11 @@ export function reindex(model: DocxModel): void {
     return acc;
   }, []);
   model.text = text;
+}
+
+/** Conservative editable spans: a wording edit must fit entirely in one ordinary text node. */
+export function wordingSpans(model: DocxModel): { start: number; end: number }[] {
+  return model.segments.filter((s) => s.node && s.wordingSafe).map(({ start, end }) => ({ start, end }));
 }
 
 /** Apply several rounds of changes, each relative to the text after the previous round. */
@@ -151,11 +168,11 @@ export function applyToDocx(model: DocxModel, changes: TextChange[]): number {
   // descending order keeps earlier offsets valid while nodes change
   for (const raw of [...changes].sort((a, b) => b.fromA - a.fromA)) {
     // a line break inside a text run is not a paragraph in Word; drop it
-    const ch = { ...raw, insert: raw.insert.replace(/\n/g, "") };
-    if (ch.insert !== raw.insert) refused++;
+    if (raw.insert.includes("\n")) { refused++; continue; }
+    const ch = raw;
     const hit = model.segments.filter((s) => s.node && s.start < ch.toA && s.end > ch.fromA);
     const fixedHit = model.segments.some((s) => !s.node && s.start < ch.toA && s.end > ch.fromA);
-    if (fixedHit) refused++;
+    if (fixedHit) { refused++; continue; }
     if (!hit.length) {
       if (!ch.insert) continue;
       // pure insertion: attach to the run that ends here, or the run that starts here

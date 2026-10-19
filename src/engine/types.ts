@@ -64,6 +64,8 @@ export interface RuleOption {
 }
 
 export interface Rule {
+  /** Moderate is technical cleanup; explicit needs selection; wording also needs preview. */
+  bulk?: "moderate" | "explicit" | "wording";
   id: string;
   group: GroupId;
   name: string;
@@ -94,6 +96,11 @@ export interface Rule {
   guard?: RegionType[];
   /** Label shown instead of the raw text for invisible characters. */
   chip?: (orig: string) => string;
+}
+
+export interface CleanupSelection {
+  ruleIds: string[];
+  includeWording: boolean;
 }
 
 export interface Finding {

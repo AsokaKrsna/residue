@@ -154,20 +154,20 @@ describe("chat residue", () => {
 describe("markdown in LaTeX", () => {
   it("converts headings, bold, italics, code, links and lists", () => {
     const t = "## Method\n**Key idea:** we use *attention* and `x_i`. See [docs](https://a.io).\n\n- first\n- second\n";
-    expect(clean(t, "tex")).toBe(
+    expect(convert(t, "tex")).toBe(
       "\\section{Method}\n\\textbf{Key idea:} we use \\emph{attention} and \\texttt{x\\_i}. See \\href{https://a.io}{docs}.\n\n\\begin{itemize}\n  \\item first\n  \\item second\n\\end{itemize}\n",
     );
   });
   it("bullet symbols become an itemize list across passes", () => {
-    expect(clean("\u2022 a\n\u2022 b\n", "tex")).toBe("\\begin{itemize}\n  \\item a\n  \\item b\n\\end{itemize}\n");
+    expect(convert("\u2022 a\n\u2022 b\n", "tex")).toBe("\\begin{itemize}\n  \\item a\n  \\item b\n\\end{itemize}\n");
   });
   it("code fences become verbatim and their content is left alone", () => {
     const t = "```python\nx = \u201Cq\u201D\n```\n";
-    expect(clean(t, "tex")).toBe("\\begin{verbatim}\nx = \u201Cq\u201D\n\\end{verbatim}\n");
+    expect(convert(t, "tex")).toBe("\\begin{verbatim}\nx = \u201Cq\u201D\n\\end{verbatim}\n");
   });
   it("Markdown files keep Markdown", () => {
     const t = "# Title\n\n**bold** and *it* with \\(x^2\\).\n";
-    expect(clean(t, "md")).toBe("# Title\n\n**bold** and *it* with $x^2$.\n");
+    expect(convert(t, "md")).toBe("# Title\n\n**bold** and *it* with $x^2$.\n");
   });
 });
 
@@ -270,3 +270,5 @@ describe("engine guarantees", () => {
     expect(performance.now() - t0).toBeLessThan(1500);
   });
 });
+
+function convert(t: string, ft: FileType) { const cfg = defaultConfig(ft); return cleanAll(t, cfg, [], { ruleIds: Object.keys(cfg.enabled), includeWording: false }).text; }

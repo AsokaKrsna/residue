@@ -74,7 +74,7 @@ export const markdownRules: Rule[] = [
     group: "md",
     name: "Inline code",
     desc: "`code` becomes \\texttt{} with special characters escaped, or plain text.",
-    scope: "text",
+    scope: "all",
     presets: PASTE,
     fileTypes: [...NON_MD],
     pattern: /(?<!`)`([^`\n]+)`(?!`)/g,

@@ -1,6 +1,6 @@
 import { GROUPS, RULES_BY_ID } from "../engine/engine";
 import { charName, hex, visualize } from "../engine/unicode";
-import { activeDoc, applyFinding, currentText, docStats, findings, ignoreFinding, liveFindings, selected, tally, toggleRule, unignoreFinding } from "./store";
+import { activeDoc, applyFinding, currentText, docStats, findings, ignoreFinding, liveFindings, selected, tally, toggleRule, unignoreFinding, copyForEditing } from "./store";
 
 const KIND_LABEL = { remove: "Removed on clean", replace: "Replaced on clean", review: "Your call", skip: "Ignored" } as const;
 
@@ -79,7 +79,14 @@ function FindingView() {
           <button class="btn small" onClick={() => ignoreFinding(f)} title="Alt+Backspace">{f.kind === "review" ? "Keep as is" : "Keep this one"}</button>
         )}
       </div>
-      <button class="linkbtn" onClick={() => toggleRule(f.ruleId)}>Turn off the rule "{rule?.name}"</button>
+      <div class="handoff">
+        <button class="btn small" onClick={() => void copyForEditing()}>Copy passage + editing prompt</button>
+        <p class="hint">You choose where to paste. These links send no document text.</p>
+        <a href="https://www.grammarly.com/" target="_blank" rel="noopener noreferrer">Grammarly</a>{" / "}
+        <a href="https://quillbot.com/" target="_blank" rel="noopener noreferrer">QuillBot</a>{" / "}
+        <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPT</a>
+      </div>
+      <button class="linkbtn" onClick={() => toggleRule(f.ruleId)}>Disable this rule: {rule?.name}</button>
     </div>
   );
 }
@@ -116,8 +123,7 @@ function Summary() {
           <div class="section-t">Writing profile</div>
           <div class="stat">
             <span>Sentence length variation</span><span class="v">{s.burstiness.toFixed(2)}</span>
-            <Gauge value={s.burstiness} max={1} warn={s.burstiness < 0.35} />
-            <span class="d">How much sentence lengths vary. Human prose usually scores above 0.45. Very even rhythm is a common LLM trait.</span>
+            <span class="d">Describes sentence lengths here. It does not establish authorship or predict a detector score.</span>
           </div>
           <div class="stat">
             <span>Average sentence</span><span class="v">{s.avgSentence.toFixed(1)} words</span>

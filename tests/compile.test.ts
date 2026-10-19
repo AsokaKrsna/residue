@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { it, expect } from "vitest";
-import { cleanAll, defaultConfig, scan } from "../src/engine/engine";
+import { cleanAll as cleanSelectedEngine, defaultConfig, scan } from "../src/engine/engine";
 
 // Writes the cleaned fixture so scripts/check-latex.sh can compile both versions with pdflatex.
 it("cleans the chat-paste fixture", () => {
@@ -13,3 +13,9 @@ it("cleans the chat-paste fixture", () => {
   expect(left.every((f) => f.kind === "review")).toBe(true);
   expect(res.passes.length).toBeGreaterThan(1);
 });
+
+// This suite tests explicitly requested conversions, not the Moderate bulk default.
+function cleanAll(...args: Parameters<typeof cleanSelectedEngine>) {
+  const [text, cfg, skips] = args;
+  return cleanSelectedEngine(text, cfg, skips, { ruleIds: Object.keys(cfg.enabled), includeWording: false });
+}

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { FileType } from "../engine/types";
 import {
-  activate, activeDoc, activeId, applyPreset, cleanEverything, closeDoc, config, cycleTheme, docs, docStats, loadSample, markBaseline,
+  activate, activeDoc, activeId, applyPreset, closeDoc, config, cycleTheme, docs, docStats, loadSample,
   currentText, newDoc, openDialog, paragraphsOf, saveActive, saveInPlace, scanMs, setFileType, showRules, tally, theme, toast, baselineParagraphs,
-  clearSavedData, convertToPlain,
+  clearSavedData, convertToPlain, rememberDocuments, setRememberDocuments,
 } from "./store";
 
 /** Sun for light, moon for dark, half-filled circle for "follow the system". */
@@ -31,6 +31,7 @@ function ThemeIcon({ mode }: { mode: string }) {
 
 const THEME_LABEL: Record<string, string> = { auto: "Theme follows your system. Click for light.", light: "Light theme. Click for dark.", dark: "Dark theme. Click to follow your system." };
 import { isPreset } from "../engine/engine";
+import { CleanMenu } from "./CleanMenu";
 import { SupportButton } from "./Support";
 
 /** Brand mark: a tile with three particles drifting away. Residue, leaving. */
@@ -68,8 +69,6 @@ function Meter() {
 const PRESET_LABEL: Record<string, string> = { latex: "LaTeX paper", markdown: "Markdown", plain: "Plain text", keep: "Keep typography", custom: "Custom" };
 
 export function TopBar() {
-  const t = tally.value;
-  const fixes = t.remove + t.replace;
   const [menu, setMenu] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -104,9 +103,7 @@ export function TopBar() {
           <option value="custom" hidden>Custom</option>
         </select>
       )}
-      <button class="btn primary" disabled={!d || fixes === 0} onClick={cleanEverything} title="Apply every enabled fix (Ctrl+Shift+L). Style signals are never changed automatically.">
-        Clean all <span class="badge num">{fixes}</span>
-      </button>
+      <CleanMenu />
       <div class="sep" />
       <button class="btn ghost" onClick={() => void openDialog()} title="Open files (Ctrl+O)">Open</button>
       <button class="btn ghost" disabled={!d} onClick={() => void saveActive()} title={saveInPlace ? "Save to the same file (Ctrl+S)" : "Download the file (Ctrl+S)"}>Save</button>
@@ -126,11 +123,12 @@ export function TopBar() {
             <button disabled={!d} onClick={run(() => void saveActive())}>Save <kbd>Ctrl S</kbd></button>
             <button disabled={!d} onClick={run(() => void saveActive(true))}>Save as</button>
             <hr />
-            <button disabled={!d} onClick={run(markBaseline)}>Compare changes from here</button>
             <button onClick={run(loadSample)}>Open the sample chapter</button>
             <button onClick={run(() => (showRules.value = !showRules.value))}>{showRules.value ? "Hide" : "Show"} rules panel</button>
             <button disabled={!d || !!d.docx} onClick={run(convertToPlain)}>Convert to plain text</button>
             <hr />
+            <label class="storage-choice"><input type="checkbox" checked={rememberDocuments.value} onChange={(e) => void setRememberDocuments(e.currentTarget.checked)} />Remember documents on this device</label>
+            <p class="hint">{rememberDocuments.value ? "Documents survive closing the browser." : "Session only. Save files before closing."}</p>
             <button onClick={run(clearSavedData)}>Clear data saved in this browser</button>
           </div>
         )}
@@ -177,13 +175,13 @@ export function StatusBar() {
           {s && <span>{s.chars.toLocaleString()} chars, {s.words.toLocaleString()} words</span>}
           {s && <span class={pNow === pBase ? "ok" : "warn"} title="Paragraph count when opened, and now">paragraphs: {pBase} at open, {pNow} now{pNow === pBase ? " (match)" : ""}</span>}
           <span>scan {scanMs.value < 1 ? "<1" : Math.round(scanMs.value)} ms</span>
-          <span>{d.handle ? (d.dirty ? "unsaved changes" : "saved to disk") : "kept in this browser"}</span>
+          <span>{d.handle ? (d.dirty ? "unsaved changes" : "saved to disk") : (rememberDocuments.value ? "remembered on this device" : "session only")}</span>
         </>
       ) : (
         <span>No document open</span>
       )}
       <span class="grow" />
-      <span class={reqs ? "warn" : "ok"} title="Requests to any other website since the page loaded. The content security policy blocks them, and your text is never sent anywhere.">requests to other sites: {reqs}</span>
+      <span class={reqs ? "warn" : "ok"} title="Limited resource indicator: excludes initial and same-origin loads; not a complete network audit. Processing is local.">requests to other sites: {reqs}</span>
       <a class="credit" href="https://www.linkedin.com/in/durjoy-majumdar/" target="_blank" rel="noopener noreferrer" title="Made by Durjoy Majumdar">Durjoy Majumdar | AsokaKrsna</a>
     </footer>
   );

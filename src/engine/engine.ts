@@ -3,7 +3,9 @@
  * Pure functions only. The UI turns findings into editor decorations and changes.
  */
 import { RULES } from "./rules";
-import { RegionIndex, scanRegions } from "./regions";
+import { RegionIndex, scanRegions, scanMarkdown, wordingRegions } from "./regions";
+import { moderateSelection } from "./bulk";
+import type { CleanupSelection } from "./types";
 import type { Change, Config, FileType, Finding, Match, Preset, Region, RegionType, Rule, RuleContext } from "./types";
 import { PRESETS } from "./types";
 
@@ -68,7 +70,8 @@ export function scan(text: string, cfg: Config, extra: Region[] = []): ScanResul
   for (const r of RULES) if (r.guard && cfg.enabled[r.id]) r.guard.forEach((g) => guarded.add(g));
   const idx: Record<RegionType, RegionIndex> = {} as never;
   for (const t of PROTECTING) idx[t] = new RegionIndex(regions.filter((r) => r.type === t));
-  const prot = new RegionIndex(regions.filter((r) => guarded.has(r.type)));
+  const prot = new RegionIndex(regions.filter((r) => guarded.has(r.type)).concat(guarded.has("verbatim") ? scanMarkdown(text).filter((r) => r.type === "verbatim") : []));
+  const wording = new RegionIndex(wordingRegions(text));
 
   const all: Finding[] = [];
   for (const rule of RULES) {
@@ -87,7 +90,8 @@ export function scan(text: string, cfg: Config, extra: Region[] = []): ScanResul
     };
     const push = (mt: Match) => {
       if (mt.end < mt.start) return;
-      if (rule.scope === "text" && ctx.isProtected(mt.start)) return;
+      if (rule.scope === "text" && prot.intersects(mt.start, mt.end)) return;
+      if (rule.bulk === "wording" && wording.intersects(mt.start, mt.end)) return;
       if (rule.scope === "math" && !ctx.inMath(mt.start)) return;
       const orig = text.slice(mt.start, mt.end);
       if (mt.repl === orig) return;
@@ -243,6 +247,7 @@ export interface CleanResult {
   text: string;
   passes: Change[][];
   applied: Record<string, number>;
+  refused: number;
 }
 
 /** A fix the user chose to keep as-is, identified by rule and position. */
@@ -266,17 +271,31 @@ export function mapPos(pos: number, changes: Change[]): number {
  * bullets become list items), so this repeats until nothing changes, up to 8 passes.
  * Skipped fixes are tracked through every pass so they stay skipped.
  */
-export function cleanAll(text: string, cfg: Config, skips: Skip[] = []): CleanResult {
+export function cleanAll(text: string, cfg: Config, skips: Skip[] = [], selection: CleanupSelection = moderateSelection(),
+  allowChange?: (finding: Finding, previousPasses: Change[][]) => boolean): CleanResult {
   const passes: Change[][] = [];
   const applied: Record<string, number> = {};
   let t = text;
   let sk = skips.slice();
+  let blocked: Skip[] = [];
+  let refused = 0;
+  const selected = new Set(selection.ruleIds);
+  // Keep scanning non-selected rules out of overlap resolution too: they cannot swallow selected fixes.
+  const bulkCfg: Config = { ...cfg, enabled: { ...cfg.enabled } };
+  for (const r of RULES) if (!r.guard) bulkCfg.enabled[r.id] = !!cfg.enabled[r.id] && selected.has(r.id)
+    && (r.bulk !== "wording" || selection.includeWording);
   // converting nested LaTeX to plain text unwraps one level per pass, so allow more passes
   const maxPasses = plainOutput(cfg) ? 24 : 8;
   for (let i = 0; i < maxPasses; i++) {
-    const isSkipped = (f: Finding) => sk.some((s) => s.ruleId === f.ruleId && s.start === f.start);
-    const { findings } = scan(t, cfg);
-    const fixes = findings.filter((f) => f.kind !== "review" && !isSkipped(f));
+    const isSkipped = (f: Finding) => [...sk, ...blocked].some((s) => s.ruleId === f.ruleId && s.start === f.start);
+    const { findings } = scan(t, bulkCfg);
+    const fixes = findings.flatMap((f) => {
+      if (isSkipped(f)) return [];
+      const wording = RULES_BY_ID_LOCAL[f.ruleId]?.bulk === "wording" && selection.includeWording;
+      if (f.kind === "review" && !wording) return [];
+      if (allowChange && !allowChange(f, passes)) { refused++; blocked.push({ ruleId: f.ruleId, start: f.start }); return []; }
+      return wording && f.suggestions[0] !== undefined ? [{ ...f, kind: "replace" as const, repl: f.suggestions[0] }] : [f];
+    });
     if (!fixes.length) break;
     const ch = changesFor(t, fixes, autoPick(isSkipped));
     if (!ch.length) break;
@@ -284,10 +303,11 @@ export function cleanAll(text: string, cfg: Config, skips: Skip[] = []): CleanRe
     passes.push(ch);
     const next = applyChanges(t, ch);
     sk = sk.map((s) => ({ ruleId: s.ruleId, start: mapPos(s.start, ch) })).filter((s) => s.start >= 0);
+    blocked = blocked.map((s) => ({ ruleId: s.ruleId, start: mapPos(s.start, ch) })).filter((s) => s.start >= 0);
     if (next === t) break;
     t = next;
   }
-  return { text: t, passes, applied };
+  return { text: t, passes, applied, refused };
 }
 
 /* ---------- statistics ---------- */
@@ -298,7 +318,7 @@ export interface Stats {
   sentences: number;
   paragraphs: number;
   avgSentence: number;
-  /** coefficient of variation of sentence length; human prose is usually above 0.45 */
+  /** Descriptive coefficient of variation; not an authorship classifier. */
   burstiness: number;
   emDashPer1k: number;
   signalsPer1k: number;

@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check:latex": "node scripts/check-latex.mjs",
-    "data:kobak": "node scripts/import-kobak.mjs"
+    "data:kobak": "node scripts/import-kobak.mjs",
+    "test:browser": "node scripts/check-browser.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

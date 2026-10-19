@@ -235,4 +235,28 @@ export class RegionIndex {
     for (let k = idx; k >= 0 && this.maxEnd[k] > pos; k--) if (this.regions[k].end > pos) return true;
     return false;
   }
+
+  /** Half-open span overlap, including a point insertion inside a region. */
+  intersects(start: number, end: number): boolean {
+    if (start === end) return this.has(start);
+    let lo = 0, hi = this.starts.length - 1, idx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.starts[mid] < end) { idx = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return idx >= 0 && this.maxEnd[idx] > start;
+  }
+}
+
+/** Additional guards for prose edits, regardless of the selected format guards. */
+export function wordingRegions(text: string): Region[] {
+  const regions = [...scanTex(text), ...scanMarkdown(text), ...scanUrls(text)];
+  const patterns = [
+    /!?\[[^\]\n]*\](?:\([^\n)]*\)|\[[^\]\n]*\])|\\(?:href|hyperlink)\{[^}\n]*\}\{[^}\n]*\}/g,
+    /"(?:\\.|[^"\\])*"|\u201C[^\u201D]*\u201D|\u2018[^\u2019]*\u2019|(?<!\w)'[^'\n]+'(?!\w)|``[\s\S]*?''/g,
+    /^\s*>[^\n]*|\\begin\{(quote|quotation)\}[\s\S]*?\\end\{\1\}/gm,
+    /\[(?:\d+[a-z]?(?:\s*[,;\u2013-]\s*\d+[a-z]?)*)\]|\([A-Z][^()\n]{0,120}\b(?:19|20)\d{2}[a-z]?[^()\n]*\)/g,
+  ];
+  for (const re of patterns) for (const m of text.matchAll(re)) regions.push({ type: "keys", start: m.index, end: m.index + m[0].length });
+  return regions;
 }

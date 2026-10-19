@@ -1,0 +1,365 @@
+{
+  "note": "60 public/synthetic samples. No private research. Null expected values are characterization probes, not effectiveness claims.",
+  "cases": [
+    {
+      "id": "connective_a",
+      "group": "paired-pattern",
+      "input": "Furthermore, the results support the hypothesis.\n",
+      "expected": null
+    },
+    {
+      "id": "connective_b",
+      "group": "paired-pattern",
+      "input": "The results support the hypothesis.\n",
+      "expected": null
+    },
+    {
+      "id": "connective_case_a",
+      "group": "paired-pattern",
+      "input": "furthermore, the results support the hypothesis.\n",
+      "expected": null
+    },
+    {
+      "id": "connective_case_b",
+      "group": "paired-pattern",
+      "input": "FURTHERMORE, the results support the hypothesis.\n",
+      "expected": null
+    },
+    {
+      "id": "connective_position_a",
+      "group": "paired-pattern",
+      "input": "Furthermore, the results support the hypothesis.\n",
+      "expected": null
+    },
+    {
+      "id": "connective_position_b",
+      "group": "paired-pattern",
+      "input": "The results furthermore support the hypothesis.\n",
+      "expected": null
+    },
+    {
+      "id": "phrase_context_a",
+      "group": "paired-pattern",
+      "input": "We delve into the evidence.\n",
+      "expected": null
+    },
+    {
+      "id": "phrase_context_b",
+      "group": "paired-pattern",
+      "input": "The word delve appears in this glossary.\n",
+      "expected": null
+    },
+    {
+      "id": "technical_term_a",
+      "group": "paired-pattern",
+      "input": "The neural network converged after 42 iterations.\n",
+      "expected": null
+    },
+    {
+      "id": "technical_term_b",
+      "group": "paired-pattern",
+      "input": "The algorithm converged after 42 iterations.\n",
+      "expected": null
+    },
+    {
+      "id": "negation_a",
+      "group": "paired-pattern",
+      "input": "The treatment increased survival.\n",
+      "expected": null
+    },
+    {
+      "id": "negation_b",
+      "group": "paired-pattern",
+      "input": "The treatment did not increase survival.\n",
+      "expected": null
+    },
+    {
+      "id": "certainty_a",
+      "group": "paired-pattern",
+      "input": "The findings may indicate a relationship.\n",
+      "expected": null
+    },
+    {
+      "id": "certainty_b",
+      "group": "paired-pattern",
+      "input": "The findings demonstrate a relationship.\n",
+      "expected": null
+    },
+    {
+      "id": "numbers_a",
+      "group": "paired-pattern",
+      "input": "The measured value was 3.14 mg at 25 degrees Celsius.\n",
+      "expected": null
+    },
+    {
+      "id": "numbers_b",
+      "group": "paired-pattern",
+      "input": "The measured value was 31.4 mg at 25 degrees Celsius.\n",
+      "expected": null
+    },
+    {
+      "id": "citation_a",
+      "group": "paired-pattern",
+      "input": "Furthermore, this result agrees with Smith (2024).\n",
+      "expected": null
+    },
+    {
+      "id": "citation_b",
+      "group": "paired-pattern",
+      "input": "Furthermore, this result agrees with [12].\n",
+      "expected": null
+    },
+    {
+      "id": "quotation_a",
+      "group": "paired-pattern",
+      "input": "The author wrote: \"Furthermore, this is important.\"\n",
+      "expected": null
+    },
+    {
+      "id": "quotation_b",
+      "group": "paired-pattern",
+      "input": "Furthermore, this is important.\n",
+      "expected": null
+    },
+    {
+      "id": "math_a",
+      "group": "paired-pattern",
+      "input": "We obtain $E = mc^2$, where mass is constant.\n",
+      "expected": null
+    },
+    {
+      "id": "math_b",
+      "group": "paired-pattern",
+      "input": "We obtain energy, where mass is constant.\n",
+      "expected": null
+    },
+    {
+      "id": "code_a",
+      "group": "paired-pattern",
+      "input": "`delve_into(data)` returns the result.\n",
+      "expected": null
+    },
+    {
+      "id": "code_b",
+      "group": "paired-pattern",
+      "input": "We delve into data to obtain the result.\n",
+      "expected": null
+    },
+    {
+      "id": "sentence_length_a",
+      "group": "paired-pattern",
+      "input": "We collected data. We tested the hypothesis. We reported results.\n",
+      "expected": null
+    },
+    {
+      "id": "sentence_length_b",
+      "group": "paired-pattern",
+      "input": "We collected data, tested the hypothesis, and reported results.\n",
+      "expected": null
+    },
+    {
+      "id": "repetition_a",
+      "group": "paired-pattern",
+      "input": "The model is robust. The model is robust.\n",
+      "expected": null
+    },
+    {
+      "id": "repetition_b",
+      "group": "paired-pattern",
+      "input": "The model is robust. The model is stable.\n",
+      "expected": null
+    },
+    {
+      "id": "unicode_a",
+      "group": "paired-pattern",
+      "input": "The result is significant.\n",
+      "expected": null
+    },
+    {
+      "id": "unicode_b",
+      "group": "paired-pattern",
+      "input": "The result is signi\u200bficant.\n",
+      "expected": null
+    },
+    {
+      "id": "plain_control_a",
+      "group": "paired-pattern",
+      "input": "The cat sat on the mat.\n",
+      "expected": null
+    },
+    {
+      "id": "plain_control_b",
+      "group": "paired-pattern",
+      "input": "The dog slept beside the door.\n",
+      "expected": null
+    },
+    {
+      "id": "control-numbers",
+      "group": "academic-control",
+      "input": "The sample contained 3.14 mg at 25 C [12].\n",
+      "expected": "The sample contained 3.14 mg at 25 C [12].\n"
+    },
+    {
+      "id": "control-negation",
+      "group": "academic-control",
+      "input": "The treatment did not increase survival.\n",
+      "expected": "The treatment did not increase survival.\n"
+    },
+    {
+      "id": "control-certainty",
+      "group": "academic-control",
+      "input": "The findings may indicate a relationship.\n",
+      "expected": "The findings may indicate a relationship.\n"
+    },
+    {
+      "id": "control-causality",
+      "group": "academic-control",
+      "input": "Exposure correlated with risk; it did not establish causation.\n",
+      "expected": "Exposure correlated with risk; it did not establish causation.\n"
+    },
+    {
+      "id": "control-citation",
+      "group": "academic-control",
+      "input": "Smith (2024) reported a 5% reduction [1].\n",
+      "expected": "Smith (2024) reported a 5% reduction [1].\n"
+    },
+    {
+      "id": "control-units",
+      "group": "academic-control",
+      "input": "Use 0.5 mL, not 5 mL, per sample.\n",
+      "expected": "Use 0.5 mL, not 5 mL, per sample.\n"
+    },
+    {
+      "id": "control-technical",
+      "group": "academic-control",
+      "input": "The Transformer encoder retained its attention weights.\n",
+      "expected": "The Transformer encoder retained its attention weights.\n"
+    },
+    {
+      "id": "control-quote",
+      "group": "academic-control",
+      "input": "The participant said \"in order to survive\".\n",
+      "expected": "The participant said \"in order to survive\".\n"
+    },
+    {
+      "id": "control-url",
+      "group": "academic-control",
+      "input": "See https://example.org/paper?id=42 for details.\n",
+      "expected": "See https://example.org/paper?id=42 for details.\n"
+    },
+    {
+      "id": "control-names",
+      "group": "academic-control",
+      "input": "Marie Curie and Pierre Curie investigated radium.\n",
+      "expected": "Marie Curie and Pierre Curie investigated radium.\n"
+    },
+    {
+      "id": "control-quantifier",
+      "group": "academic-control",
+      "input": "Some participants improved; all completed follow-up.\n",
+      "expected": "Some participants improved; all completed follow-up.\n"
+    },
+    {
+      "id": "control-paragraphs",
+      "group": "academic-control",
+      "input": "The first result.\n\nThe second result.\n",
+      "expected": "The first result.\n\nThe second result.\n"
+    },
+    {
+      "id": "control-bib",
+      "group": "academic-control",
+      "input": "@article{test2024, title={Valid research}}\n",
+      "expected": "@article{test2024, title={Valid research}}\n"
+    },
+    {
+      "id": "control-markdown",
+      "group": "academic-control",
+      "input": "# Results\n\n**Important** evidence remains.\n",
+      "expected": "# Results\n\n**Important** evidence remains.\n"
+    },
+    {
+      "id": "artifact-zero-width",
+      "group": "artifact",
+      "input": "a\u200bb\n",
+      "expected": "ab\n"
+    },
+    {
+      "id": "artifact-soft-hyphen",
+      "group": "artifact",
+      "input": "re\u00adsearch\n",
+      "expected": "research\n"
+    },
+    {
+      "id": "artifact-word-joiner",
+      "group": "artifact",
+      "input": "data\u2060set\n",
+      "expected": "dataset\n"
+    },
+    {
+      "id": "artifact-nbsp",
+      "group": "artifact",
+      "input": "3.14\u00a0mg\n",
+      "expected": "3.14 mg\n"
+    },
+    {
+      "id": "artifact-thin-space",
+      "group": "artifact",
+      "input": "A\u2009sample\n",
+      "expected": "A sample\n"
+    },
+    {
+      "id": "artifact-mojibake",
+      "group": "artifact",
+      "input": "don\u00e2\u20ac\u2122t\n",
+      "expected": "don't\n"
+    },
+    {
+      "id": "artifact-curly-quotes",
+      "group": "artifact",
+      "input": "\u201cevidence\u201d\n",
+      "expected": "\"evidence\"\n"
+    },
+    {
+      "id": "artifact-line-endings",
+      "group": "artifact",
+      "input": "First.\r\nSecond.\r\n",
+      "expected": "First.\nSecond.\n"
+    },
+    {
+      "id": "artifact-trailing-space",
+      "group": "artifact",
+      "input": "Findings.  \n",
+      "expected": "Findings.\n"
+    },
+    {
+      "id": "artifact-ellipsis",
+      "group": "artifact",
+      "input": "Wait\u2026\n",
+      "expected": "Wait...\n"
+    },
+    {
+      "id": "artifact-homoglyph",
+      "group": "artifact",
+      "input": "d\u0430ta\n",
+      "expected": "data\n"
+    },
+    {
+      "id": "artifact-combining-accent",
+      "group": "artifact",
+      "input": "cafe\u0301\n",
+      "expected": "caf\u00e9\n"
+    },
+    {
+      "id": "artifact-citation-token",
+      "group": "artifact",
+      "input": "Evidence :contentReference[oaicite:2]{index=2}.\n",
+      "expected": "Evidence.\n"
+    },
+    {
+      "id": "artifact-mixed-claim",
+      "group": "artifact",
+      "input": "No\u200b effect was observed in 3.14\u00a0mg [12].\n",
+      "expected": "No effect was observed in 3.14 mg [12].\n"
+    }
+  ]
+}

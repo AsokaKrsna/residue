@@ -1,11 +1,12 @@
 import { batch, computed, signal } from "@preact/signals";
 import { ChangeSet, Compartment, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { undo as cmUndo } from "@codemirror/commands";
+import { isolateHistory, undo as cmUndo } from "@codemirror/commands";
 import { del as idbDel, get as idbGet, set as idbSet } from "idb-keyval";
 import {
   RULES, RULES_BY_ID, changesFor, cleanAll, defaultConfig, fileTypeFromName, presetForFile, scan, stats as computeStats,
   type Stats,
+  type CleanResult,
 } from "../engine/engine";
 import type { Config, FileType, Finding, Preset } from "../engine/types";
 import {
@@ -15,7 +16,33 @@ import {
 import { canSaveInPlace, decodeFile, isUnsupportedBinary, openFiles, save as saveFile, saveAs as saveFileAs, type OpenedFile } from "./files";
 import { SAMPLE_NAME, SAMPLE_TEXT } from "./sample";
 import { recordFixes } from "./tips";
-import { DOCX_DISABLED, applyToDocx, loadDocx, saveDocx } from "../formats/docx";
+import { DOCX_DISABLED, applyToDocx, loadDocx, saveDocx, wordingSpans } from "../formats/docx";
+
+import { moderateSelection } from "../engine/bulk";
+import type { CleanupSelection, Change } from "../engine/types";
+import { journal, appliedRulesField, setAppliedRules, addApplied } from "./journal";
+import { editingPrompt } from "./handoff";
+
+export const bulkSelection = signal<CleanupSelection>(moderateSelection());
+export const bulkPreview = signal<{ before: string; result: CleanResult; docId: string } | null>(null);
+export const lastRefused = signal(0);
+export function resetBulk() { bulkSelection.value = moderateSelection(); }
+export function toggleBulkRule(id: string) {
+  const s = bulkSelection.value;
+  bulkSelection.value = { ...s, ruleIds: s.ruleIds.includes(id) ? s.ruleIds.filter((x) => x !== id) : [...s.ruleIds, id] };
+}
+export function setBulkGroup(ids: string[], on: boolean) {
+  const s = bulkSelection.value;
+  bulkSelection.value = { ...s, ruleIds: [...new Set([...s.ruleIds.filter((id) => !ids.includes(id)), ...(on ? ids : [])])] };
+}
+export function setBulkWording(on: boolean) {
+  bulkSelection.value = { ...bulkSelection.value, includeWording: on,
+    ruleIds: on ? [...new Set([...bulkSelection.value.ruleIds, "sty.concise"])] : bulkSelection.value.ruleIds.filter((id) => id !== "sty.concise") };
+}
+export const appliedRuleCounts = computed(() => {
+  docVersion.value;
+  return view?.state.field(appliedRulesField, false) ?? {};
+});
 
 /* ---------- documents ---------- */
 
@@ -38,8 +65,8 @@ export const activeDoc = computed(() => docs.value.find((d) => d.id === activeId
 
 const states = new Map<string, EditorState>();
 const langSlots = new Map<string, Compartment>();
-/** Word documents: the file bytes as last saved, and every text change since then */
-const docxData = new Map<string, { bytes: Uint8Array; changes: ChangeSet; hidden: { start: number; end: number }[] }>();
+/** Word documents: immutable opening bytes and all text changes since opening (including undo). */
+const docxData = new Map<string, { bytes: Uint8Array; changes: ChangeSet; hidden: { start: number; end: number }[]; wording: { start: number; end: number }[] }>();
 let view: EditorView | null = null;
 
 /* ---------- rules config, saved per file type ---------- */
@@ -173,10 +200,10 @@ function stillThere(f: Finding): boolean {
   return !!view && view.state.doc.sliceString(f.start, f.end) === f.orig;
 }
 
-function dispatchChanges(changes: { from: number; to: number; insert: string }[], label: string) {
+function dispatchChanges(changes: { from: number; to: number; insert: string }[], label: string, applied: Record<string, number> = {}) {
   if (!view || !changes.length) return;
   const cs = ChangeSet.of(changes, view.state.doc.length);
-  view.dispatch({ changes: cs, userEvent: label, scrollIntoView: false });
+  view.dispatch({ changes: cs, effects: setAppliedRules.of(addApplied(view.state.field(appliedRulesField), applied)), annotations: isolateHistory.of("full"), userEvent: label, scrollIntoView: false });
   flash(cs);
 }
 
@@ -197,7 +224,11 @@ export function applyFinding(f: Finding, pick?: number) {
   const tail = f.kind === "review" && value !== "" && !/\s$/.test(value) ? (/\s+$/.exec(f.orig)?.[0] ?? "") : "";
   const changes = changesFor(text, [f], () => value + tail);
   const next = neighbour(f);
-  dispatchChanges(changes, "input.residue");
+  if (activeDoc.value?.docx && RULES_BY_ID[f.ruleId]?.group === "sty" && !wordingAllowed(f, [])) {
+    lastRefused.value = 1;
+    toastMsg("Wording crosses a Word run, field, link, or protected structure. Edit this passage in Word instead."); return;
+  }
+  dispatchChanges(changes, "input.residue", { [f.ruleId]: 1 });
   selectedId.value = next;
   scheduleScan(0);
 }
@@ -225,32 +256,70 @@ export function applyRule(ruleId: string) {
   const st = view.state;
   const list = findings.value.filter((f) => f.ruleId === ruleId && f.kind !== "review" && !isIgnored(st, f) && stillThere(f));
   const text = st.doc.toString();
-  dispatchChanges(changesFor(text, list, (f) => f.repl), "input.residue");
+  dispatchChanges(changesFor(text, list, (f) => f.repl), "input.residue", { [ruleId]: list.length });
   recordFixes(list.length, false);
   toastMsg(`${list.length} ${list.length === 1 ? "fix" : "fixes"} applied: ${RULES_BY_ID[ruleId]?.name ?? ruleId}. Ctrl+Z to undo.`);
   scheduleScan(0);
 }
 
-/** Apply every enabled fix, repeating until the text is stable. One undo step. */
-export function cleanEverything() {
+/** Map ordinary Word text-node spans through edits without widening run boundaries. */
+function wordingAllowed(f: Finding, passes: Change[][]): boolean {
+  const dx = activeDoc.value && docxData.get(activeDoc.value.id);
+  if (!dx || !view) return true;
+  let mapping = dx.changes;
+  for (const pass of passes) mapping = mapping.compose(ChangeSet.of(pass, mapping.newLength));
+  return dx.wording.some((span) => mapping.mapPos(span.start, 1) <= f.start && mapping.mapPos(span.end, -1) >= f.end);
+}
+
+export function planCleanup(selection = bulkSelection.value): CleanResult | null {
+  if (!view || !activeDoc.value) return null;
+  return cleanAll(currentText(), effectiveConfig(), ignoredList(view.state), selection,
+    (f, passes) => RULES_BY_ID[f.ruleId]?.bulk !== "wording" || wordingAllowed(f, passes));
+}
+
+export function cleanEverything(selection = bulkSelection.value) {
   if (!view || !activeDoc.value) return;
-  const st = view.state;
-  const text = st.doc.toString();
-  const res = cleanAll(text, effectiveConfig(), ignoredList(st));
-  if (!res.passes.length) { toastMsg("Nothing to fix. Style signals stay for you to review."); return; }
-  let cs = ChangeSet.empty(text.length);
-  let len = text.length;
-  for (const pass of res.passes) {
-    const next = ChangeSet.of(pass, len);
-    cs = cs.compose(next);
-    len = next.newLength;
+  const result = planCleanup(selection);
+  if (!result) return;
+  lastRefused.value = result.refused;
+  if (!result.passes.length) { toastMsg(result.refused ? `${result.refused} wording edit(s) refused to protect Word structure.` : "Nothing selected to clean. Review findings stay for your decision."); return; }
+  if (selection.includeWording) {
+    bulkPreview.value = { before: currentText(), result, docId: activeDoc.value.id }; return;
   }
-  view.dispatch({ changes: cs, userEvent: "input.residue.clean", scrollIntoView: false });
+  applyCleanup(result);
+}
+
+function applyCleanup(result: CleanResult) {
+  if (!view) return;
+  let cs = ChangeSet.empty(view.state.doc.length);
+  for (const pass of result.passes) cs = cs.compose(ChangeSet.of(pass, cs.newLength));
+  view.dispatch({ changes: cs, effects: setAppliedRules.of(addApplied(view.state.field(appliedRulesField), result.applied)),
+    annotations: isolateHistory.of("full"), userEvent: "input.residue.clean", scrollIntoView: false });
   flash(cs);
-  const n = Object.values(res.applied).reduce((a, b) => a + b, 0);
+  const n = Object.values(result.applied).reduce((a, b) => a + b, 0);
   recordFixes(n, true);
-  toastMsg(`Cleaned ${n} ${n === 1 ? "issue" : "issues"} in ${res.passes.length} ${res.passes.length === 1 ? "pass" : "passes"}.`, { label: "Undo", run: undo });
+  toastMsg(`Applied ${n} selected fixes.${result.refused ? ` ${result.refused} Word wording edit(s) refused.` : ""}`, { label: "Undo", run: undo });
   scheduleScan(0);
+}
+
+export function acceptBulkPreview() {
+  const preview = bulkPreview.value;
+  bulkPreview.value = null;
+  if (!preview || !view || preview.docId !== activeDoc.value?.id || currentText() !== preview.before) {
+    toastMsg("Document changed. Run cleanup again to preview the current text."); return;
+  }
+  applyCleanup(preview.result);
+}
+
+export async function copyForEditing() {
+  if (!view) return;
+  const range = view.state.selection.main;
+  const f = selected.value;
+  const passage = !range.empty ? view.state.sliceDoc(range.from, range.to) : f ?
+    currentText().slice(Math.max(0, (currentText().lastIndexOf("\n\n", f.start) < 0 ? 0 : currentText().lastIndexOf("\n\n", f.start) + 2)), (() => { const end = currentText().indexOf("\n\n", f.end); return end < 0 ? currentText().length : end; })()) : "";
+  if (!passage) { toastMsg("Select a passage or finding first."); return; }
+  try { await navigator.clipboard.writeText(editingPrompt(passage)); toastMsg("Passage and editing instructions copied. Nothing was sent to another service."); }
+  catch { toastMsg("Clipboard unavailable. Select and copy the passage manually."); }
 }
 
 export function undo() {
@@ -292,10 +361,10 @@ const hooks = {
   ],
 };
 
-function createState(doc: Doc, text: string): EditorState {
+function createState(doc: Doc, text: string, applied: Record<string, number> = {}): EditorState {
   const slot = new Compartment();
   langSlots.set(doc.id, slot);
-  const ext = baseExtensions(doc.fileType, hooks, slot.of(languageFor(doc.fileType)));
+  const ext = [...baseExtensions(doc.fileType, hooks, slot.of(languageFor(doc.fileType))), journal, appliedRulesField.init(() => applied)];
   if (doc.docx) ext.push(EditorState.readOnly.of(true));
   return EditorState.create({ doc: text, extensions: ext });
 }
@@ -347,7 +416,7 @@ export function addDoc(name: string, text: string, opts: { handle?: FileSystemFi
     untitled: !!opts.untitled,
     docx: !!opts.docx,
   };
-  if (opts.docx) docxData.set(doc.id, { bytes: opts.docx, changes: ChangeSet.empty(normalized.length), hidden: [] });
+  if (opts.docx) docxData.set(doc.id, { bytes: opts.docx, changes: ChangeSet.empty(normalized.length), hidden: [], wording: [] });
   states.set(doc.id, createState(doc, normalized));
   docs.value = [...docs.value, doc];
   activate(doc.id);
@@ -393,15 +462,6 @@ export function loadSample() {
   addDoc(SAMPLE_NAME, SAMPLE_TEXT, { untitled: true });
 }
 
-export function markBaseline() {
-  const d = activeDoc.value;
-  if (!d) return;
-  const text = currentText();
-  docs.value = docs.value.map((x) => (x.id === d.id ? { ...x, baseline: text } : x));
-  baselineParagraphs.value = paragraphsOf(text, d.docx);
-  toastMsg("Changes view now compares against the current text.");
-}
-
 /* ---------- open and save ---------- */
 
 async function openOne(f: OpenedFile) {
@@ -410,13 +470,13 @@ async function openOne(f: OpenedFile) {
       const model = await loadDocx(f.bytes);
       const doc = addDoc(f.name, model.text, { handle: f.handle, fileType: "txt", docx: f.bytes });
       const dx = docxData.get(doc.id);
-      if (dx) dx.hidden = model.hidden;
+      if (dx) { dx.hidden = model.hidden; dx.wording = wordingSpans(model); }
       scheduleScan(0);
       if (model.hidden.length) {
         toastMsg(`${f.name} contains ${model.hidden.length} piece${model.hidden.length === 1 ? "" : "s"} of hidden, white or tiny text. They are flagged in the editor.`);
         return;
       }
-      toastMsg(`${f.name}: Word document. Typing is off; rules fix the text and Save keeps all formatting.`);
+      toastMsg(`${f.name}: Word document. Typing is off. Review changes and verify the saved file in Word.`);
     } catch (e) {
       toastMsg(`Could not open ${f.name}: ${(e as Error).message}`);
     }
@@ -457,16 +517,11 @@ export async function saveActive(as = false) {
     dx.changes.iterChanges((fromA, toA, _fb, _tb, ins) => changes.push({ fromA, toA, insert: ins.toString() }));
     const refused = applyToDocx(model, changes);
     text = await saveDocx(model);
-    if (refused) toastMsg(`${refused} change(s) touched paragraph breaks and were left out, so no paragraphs were merged.`);
+    if (refused) { lastRefused.value = refused; toastMsg(`${refused} change(s) cannot be represented safely in Word. Undo these edits before saving.`); return; }
   }
   try {
     const res = as || !d.handle ? await saveFileAs(d.name, text) : await saveFile(d.name, text, d.handle);
     if (res.kind === "cancelled") return;
-    if (dx && text instanceof Uint8Array) {
-      dx.bytes = text;
-      dx.changes = ChangeSet.empty(view.state.doc.length);
-      dx.hidden = (await loadDocx(text)).hidden;
-    }
     docs.value = docs.value.map((x) =>
       x.id === d.id ? { ...x, dirty: false, untitled: false, name: res.name, handle: res.kind === "saved" ? res.handle : x.handle } : x,
     );
@@ -482,38 +537,70 @@ export const saveInPlace = canSaveInPlace;
 /* ---------- autosave (this browser only) ---------- */
 
 const SESSION_KEY = "residue.session.v1";
+const STORAGE_KEY = "residue.remember-documents.v2";
+export const rememberDocuments = signal((() => { try { return localStorage.getItem(STORAGE_KEY) === "true"; } catch { return false; } })());
+export const legacySaved = signal(false);
+let storageQueue: Promise<unknown> = Promise.resolve();
 let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
 function scheduleAutosave() {
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(persist, 800);
+  if (rememberDocuments.value && !legacySaved.value) autosaveTimer = setTimeout(persist, 800);
 }
-async function persist() {
+function persist() {
+  if (!rememberDocuments.value || legacySaved.value) return;
   if (view && activeDoc.value) states.set(activeDoc.value.id, view.state);
   const payload = docs.value.map((d) => {
     const dx = docxData.get(d.id);
-    return { ...d, text: states.get(d.id)?.doc.toString() ?? "", docxBytes: dx?.bytes, docxChanges: dx?.changes.toJSON() };
+    return { ...d, text: states.get(d.id)?.doc.toString() ?? "", appliedRules: states.get(d.id)?.field(appliedRulesField) ?? {}, docxBytes: dx?.bytes, docxChanges: dx?.changes.toJSON() };
   });
-  try { await idbSet(SESSION_KEY, { docs: payload, activeId: activeId.value }); } catch { /* private mode: no autosave */ }
+  storageQueue = storageQueue.catch(() => {}).then(async () => {
+    if (!rememberDocuments.value || legacySaved.value) return;
+    try { await idbSet(SESSION_KEY, { docs: payload, activeId: activeId.value }); }
+    catch { toastMsg("Could not remember documents on this device. Save a file to keep your work."); }
+  });
 }
 
-export async function restoreSession(): Promise<boolean> {
+export async function setRememberDocuments(on: boolean) {
+  if (legacySaved.value && on) { toastMsg("Restore or remove the previous saved documents first."); return; }
+  rememberDocuments.value = on;
+  try { localStorage.setItem(STORAGE_KEY, String(on)); } catch { /* session setting still applies */ }
+  clearTimeout(autosaveTimer);
+  if (on) persist();
+  else await forgetSavedDocuments();
+}
+
+export async function forgetSavedDocuments() {
+  rememberDocuments.value = false;
+  clearTimeout(autosaveTimer);
+  try { localStorage.setItem(STORAGE_KEY, "false"); } catch { /* unavailable */ }
+  storageQueue = storageQueue.catch(() => {}).then(() => idbDel(SESSION_KEY));
+  try { await storageQueue; legacySaved.value = false; toastMsg("Saved browser documents removed. Open documents and disk files are unchanged."); return true; }
+  catch { legacySaved.value = true; toastMsg("Could not remove saved documents. Use your browser's site-data controls."); return false; }
+}
+
+export async function restoreSession(confirmed = false): Promise<boolean> {
   try {
-    const s = (await idbGet(SESSION_KEY)) as { docs: (Doc & { text: string; docxBytes?: Uint8Array; docxChanges?: unknown })[]; activeId: string | null } | undefined;
+    const s = (await idbGet(SESSION_KEY)) as { docs: (Doc & { text: string; docxBytes?: Uint8Array; docxChanges?: unknown; appliedRules?: Record<string, number> })[]; activeId: string | null } | undefined;
     if (!s?.docs?.length) return false;
+    if (!rememberDocuments.value && !confirmed) { legacySaved.value = true; return false; }
+    if (confirmed && docs.value.length) { toastMsg("Close current documents before restoring the previous session."); return false; }
     for (const d of s.docs) {
       if (d.docx && d.docxBytes) {
-        const hidden = await loadDocx(d.docxBytes).then((m) => m.hidden).catch(() => []);
-        docxData.set(d.id, { bytes: d.docxBytes, changes: d.docxChanges ? ChangeSet.fromJSON(d.docxChanges) : ChangeSet.empty(d.text.length), hidden });
+        const model = await loadDocx(d.docxBytes);
+        docxData.set(d.id, { bytes: d.docxBytes, changes: d.docxChanges ? ChangeSet.fromJSON(d.docxChanges) : ChangeSet.empty(d.text.length), hidden: model.hidden, wording: wordingSpans(model) });
       }
-      states.set(d.id, createState(d, d.text));
+      states.set(d.id, createState(d, d.text, d.appliedRules ?? {}));
     }
-    docs.value = s.docs.map(({ text: _t, docxBytes: _b, docxChanges: _c, ...d }) => d);
+    if (confirmed) {
+      rememberDocuments.value = true;
+      try { localStorage.setItem(STORAGE_KEY, "true"); } catch { /* unavailable */ }
+    }
+    docs.value = s.docs.map(({ text: _t, docxBytes: _b, docxChanges: _c, appliedRules: _a, ...d }) => d);
+    legacySaved.value = false;
     const id = s.activeId && s.docs.some((d) => d.id === s.activeId) ? s.activeId : s.docs[0].id;
     activate(id);
     return true;
-  } catch {
-    return false;
-  }
+  } catch { toastMsg("Could not restore saved documents. The saved copy was not deleted."); return false; }
 }
 
 /* ---------- theme ---------- */
@@ -537,14 +624,14 @@ export function convertToPlain() {
   const ids = RULES.filter((r) => r.group === "plain").map((r) => r.id);
   setGroup(ids, true);
   // setGroup schedules a scan; clean right away with the new settings
-  cleanEverything();
+  cleanEverything({ ruleIds: RULES.filter((r) => r.group !== "sty").map((r) => r.id), includeWording: false });
   toastMsg("Converted to plain text. The rules stay on for this file type until you switch them off in Convert to plain text.", { label: "Undo", run: undo });
 }
 
 /** Forget open documents and settings kept in this browser. Files on disk are not touched. */
 export async function clearSavedData() {
   if (!window.confirm("Remove the documents and settings saved in this browser? Files on your disk are not affected.")) return;
-  try { await idbDel(SESSION_KEY); } catch { /* ignore */ }
+  if (!await forgetSavedDocuments()) return;
   try { localStorage.removeItem(CFG_KEY); localStorage.removeItem("residue.theme"); } catch { /* ignore */ }
   location.reload();
 }

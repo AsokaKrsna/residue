@@ -39,7 +39,9 @@ export const DELETE = "(delete)";
 
 /** Small helper so rule files stay declarative. */
 export function rule(r: Rule): Rule {
-  return r;
+  const moderate = /^(?:inv\.|enc\.|sp\.|pu\.|uf\.|ws\.)/.test(r.id) && !["inv.hidden", "ws.unwrap"].includes(r.id)
+    || ["res.cite", "res.entity", "res.utm", "res.wrapper", "tex.mathsym", "md.mathdelim"].includes(r.id);
+  return { bulk: moderate ? "moderate" : "explicit", ...r };
 }
 
 export type Ctx = RuleContext;
