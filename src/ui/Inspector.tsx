@@ -106,7 +106,7 @@ function Summary() {
       <div>
         <div class="section-t">This document</div>
         <p style={{ marginTop: "4px" }}>
-          {t.remove + t.replace + t.review === 0
+          {s?.chars === 0 ? "Paste text or type to begin the review." : t.remove + t.replace + t.review === 0
             ? "Nothing left to fix or review with the current rules."
             : `${t.remove + t.replace} fixes wait for Clean all. ${t.review} ${t.review === 1 ? "signal needs" : "signals need"} your judgement.`}
         </p>
@@ -121,6 +121,7 @@ function Summary() {
       {s && s.words > 30 && (
         <div style={{ display: "grid", gap: "12px" }}>
           <div class="section-t">Writing profile</div>
+          <p>Pattern checks review wording and structure. They do not verify AI authorship or statistical text watermarks.</p>
           <div class="stat">
             <span>Sentence length variation</span><span class="v">{s.burstiness.toFixed(2)}</span>
             <span class="d">Describes sentence lengths here. It does not establish authorship or predict a detector score.</span>
@@ -130,7 +131,7 @@ function Summary() {
           </div>
           <div class="stat">
             <span>Em dashes per 1000 words</span><span class="v">{s.emDashPer1k.toFixed(1)}</span>
-            <Gauge value={s.emDashPer1k} max={12} warn={s.emDashPer1k > 4} />
+            <span class="d">Descriptive count. Em dashes are ordinary punctuation, not evidence of AI use.</span>
           </div>
           <div class="stat">
             <span>Style signals per 1000 words</span><span class="v">{s.signalsPer1k.toFixed(1)}</span>

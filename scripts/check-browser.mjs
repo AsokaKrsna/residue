@@ -31,7 +31,7 @@ const context = await browser.newContext({ viewport: { width: 1480, height: 960 
 const page = await context.newPage();
 page.on("pageerror", (e) => errors.push(e.message));
 const outbound = [];
-context.on("request", (req) => { if (!req.url().startsWith(origin) && !req.url().startsWith("file:")) outbound.push(req.url()); });
+context.on("request", (req) => { if (!req.url().startsWith(origin) && !req.url().startsWith("file:") && !req.url().startsWith(`blob:${origin}/`) && !req.url().startsWith("blob:null/")) outbound.push(req.url()); });
 const button = (name) => page.getByRole("button", { name, exact: true });
 const editor = () => page.locator(".cm-content");
 async function text(value) {
@@ -66,6 +66,58 @@ try {
   await page.goto(origin);
   await page.evaluate(() => document.fonts.ready);
   await newText("In order to test, we may not change 3.14 mg [12].\n");
+  // Theme overrides must beat CodeMirror's injected light defaults.
+  for (const mode of ["light", "dark", "auto"]) {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.evaluate((mode) => {
+      if (mode === "auto") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", mode);
+    }, mode);
+    const colors = await page.evaluate(() => ({
+      editor: getComputedStyle(document.querySelector(".cm-editor")).backgroundColor,
+      gutter: getComputedStyle(document.querySelector(".cm-gutters")).backgroundColor,
+      line: getComputedStyle(document.querySelector(".cm-activeLine")).backgroundColor,
+    }));
+    assert.equal(colors.gutter, colors.editor, `${mode}: gutter matches editor`);
+    assert.notEqual(colors.line, "rgb(204, 238, 255)", `${mode}: active line uses app palette`);
+  }
+  assert.equal(await page.locator(".group-toggle[aria-expanded='true']").count(), 0);
+  const group = page.getByRole("button", { name: "Invisible characters", exact: true });
+  await group.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await group.getAttribute("aria-expanded"), "true");
+  await page.keyboard.press("Space");
+  assert.equal(await group.getAttribute("aria-expanded"), "false");
+  await page.getByRole("searchbox", { name: "Filter rules" }).fill("Zero-width");
+  assert.equal(await page.locator(".rulelist:visible .nm").innerText(), "Zero-width spaces");
+  await page.getByRole("searchbox", { name: "Filter rules" }).fill("");
+  assert.equal(await group.getAttribute("aria-expanded"), "false");
+  assert.equal(await page.getByRole("combobox", { name: "File type", exact: true }).count(), 1);
+  assert.equal(await page.getByRole("combobox", { name: "Cleanup preset", exact: true }).count(), 1);
+  await mkdir("LLM-Workspace/out", { recursive: true });
+  await page.screenshot({ path: "LLM-Workspace/out/ui-dark-collapsed.png", fullPage: true });
+  // Large scans use the worker. Subsequent edits must supersede older results.
+  console.log("Checking large-document worker…");
+  const largeText = Array.from({ length: 9000 }, (_, i) => `measurement${i}`).join(" ") + ".\n";
+  await editor().fill(largeText);
+  await page.waitForTimeout(500);
+  await waitFor(async () => !(await page.locator(".meter").innerText()).includes("Scanning"), "large background scan");
+  console.log("Checking superseded scan…");
+  await editor().fill(largeText + "Studies show an effect.\n");
+  await page.waitForTimeout(460);
+  await editor().fill("In order to test, we may not change 3.14 mg [12].\n");
+  await waitFor(async () => !(await page.locator(".meter").innerText()).includes("Scanning"), "superseded scan");
+  assert.match(await editor().innerText(), /^In order to test/);
+  assert.equal(await page.locator(".f").filter({ hasText: "Studies" }).count(), 0);
+  const academicText = "In today's rapidly evolving world, this method plays a pivotal role in analysis. The possibilities are endless. " +
+    "The analysis compares measured outcomes across the study groups and reports the observed differences with their uncertainty. ".repeat(7);
+  await text(academicText);
+  await page.locator('[data-fid^="sty.cluster@"]').first().click();
+  assert.match(await page.locator(".insp").innerText(), /3 pattern families/);
+  assert.match(await page.locator(".insp").innerText(), /not evidence of AI authorship/);
+  await page.screenshot({ path: "LLM-Workspace/out/academic-desktop.png", fullPage: true });
+  await text("In order to test, we may not change 3.14 mg [12].\n");
+  console.log("Checking cleanup and session workflows…");
   await button("Select cleanup rules").click();
   assert.match(await page.locator("#clean-options").innerText(), /Moderate/);
   await page.getByLabel("Include wording cleanup", { exact: false }).check();
@@ -151,9 +203,6 @@ try {
 
   await mkdir("LLM-Workspace/out", { recursive: true });
   await page.screenshot({ path: "LLM-Workspace/out/selective-desktop.png", fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: "LLM-Workspace/out/selective-mobile.png", fullPage: true });
-  await page.setViewportSize({ width: 1480, height: 960 });
 
   // Full UI Word round trip: normal run accepted, differently formatted runs refused.
   const zip = await JSZip.loadAsync(await readFile("tests/fixtures/chat-paste.docx"));
@@ -188,11 +237,16 @@ try {
   await page.keyboard.press("Escape");
 
   const offline = await context.newPage();
+  console.log("Checking offline worker…");
   offline.on("pageerror", (e) => errors.push(e.message));
   await context.setOffline(true);
   await offline.goto(new URL("../dist-offline/residue-offline.html", import.meta.url).href);
   await offline.getByRole("button", { name: "New document", exact: true }).click();
   await offline.getByRole("combobox", { name: "File type", exact: true }).selectOption("txt");
+  await offline.locator(".cm-content").fill(largeText);
+  await offline.waitForTimeout(500);
+  await waitFor(async () => !(await offline.locator(".meter").innerText()).includes("Scanning"), "offline inline worker");
+  assert.match(await offline.locator(".status").innerText(), new RegExp(`${largeText.length.toLocaleString("en-US")} chars`));
   await offline.locator(".cm-content").fill("Offline a\u200Bb\n");
   await offline.waitForTimeout(350);
   await offline.getByRole("button", { name: "Clean all 1", exact: true }).click();

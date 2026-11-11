@@ -7,6 +7,7 @@ import { punctuationRules } from "./punctuation";
 import { residueRules } from "./residue";
 import { spaceRules, whitespaceRules } from "./spaces";
 import { styleRules } from "./style";
+import { academicRules } from "./academic";
 import { plainRules } from "./plain";
 
 export const GROUPS: Group[] = [
@@ -14,7 +15,7 @@ export const GROUPS: Group[] = [
   { id: "enc", name: "Encoding damage", blurb: "Garbled or lost characters from the wrong encoding." },
   { id: "res", name: "Chat residue", blurb: "Citation tokens, tracking links and chatbot talk." },
   { id: "sp", name: "Spaces and line breaks", blurb: "Odd spaces that look normal but are not." },
-  { id: "pu", name: "Dashes, quotes and symbols", blurb: "Typography that marks text as pasted from a chat." },
+  { id: "pu", name: "Dashes, quotes and symbols", blurb: "Typography and format compatibility. These characters do not establish authorship." },
   { id: "uf", name: "Lookalikes and styled letters", blurb: "Letters from other alphabets and Unicode styles." },
   { id: "md", name: "Markdown leftovers", blurb: "Chat formatting pasted into LaTeX or plain text." },
   { id: "ws", name: "Whitespace and layout", blurb: "Trailing spaces and extra blank lines. Paragraphs are safe." },
@@ -33,6 +34,7 @@ export const RULES: Rule[] = [
   ...markdownRules,
   ...whitespaceRules,
   ...latexRules,
+  ...academicRules,
   ...styleRules,
   ...plainRules,
 ];

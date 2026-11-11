@@ -3,7 +3,7 @@ import type { FileType } from "../engine/types";
 import {
   activate, activeDoc, activeId, applyPreset, closeDoc, config, cycleTheme, docs, docStats, loadSample,
   currentText, newDoc, openDialog, paragraphsOf, saveActive, saveInPlace, scanMs, setFileType, showRules, tally, theme, toast, baselineParagraphs,
-  clearSavedData, convertToPlain, rememberDocuments, setRememberDocuments,
+  clearSavedData, convertToPlain, rememberDocuments, setRememberDocuments, scanning,
 } from "./store";
 
 /** Sun for light, moon for dark, half-filled circle for "follow the system". */
@@ -61,7 +61,7 @@ function Meter() {
           </>
         )}
       </div>
-      <span class="num">{total === 0 ? "Clean" : `${fixes} to fix, ${t.review} to review`}</span>
+      <span class="num" role="status">{scanning.value ? "Scanning…" : docStats.value?.chars === 0 ? "Empty document" : total === 0 ? "No findings" : `${fixes} to fix, ${t.review} to review`}</span>
     </div>
   );
 }
@@ -95,13 +95,15 @@ export function TopBar() {
       </div>
       {d && <Meter />}
       {d && (
-        <select aria-label="Preset" value={isPreset(config.value.preset) ? config.value.preset : "custom"} onChange={(e) => {
+        <label class="preset-control">Cleanup preset
+        <select aria-label="Cleanup preset" title="Choose cleanup rules; file format is set in the status bar" value={isPreset(config.value.preset) ? config.value.preset : "custom"} onChange={(e) => {
           const v = (e.target as HTMLSelectElement).value;
           if (isPreset(v)) applyPreset(v);
         }}>
           {["latex", "markdown", "plain", "keep"].map((p) => <option value={p} key={p}>{PRESET_LABEL[p]}</option>)}
           <option value="custom" hidden>Custom</option>
         </select>
+        </label>
       )}
       <CleanMenu />
       <div class="sep" />
@@ -166,7 +168,7 @@ export function StatusBar() {
     <footer class="status">
       {d ? (
         <>
-          <label>
+          <label class="file-type-control">File type
             <select aria-label="File type" value={d.fileType} onChange={(e) => setFileType((e.target as HTMLSelectElement).value as FileType)} style={{ fontFamily: "var(--mono)", fontSize: "11px", padding: "0 4px" }}>
               {(Object.keys(TYPE_LABEL) as FileType[]).map((ft) => <option value={ft} key={ft}>{TYPE_LABEL[ft]}</option>)}
             </select>

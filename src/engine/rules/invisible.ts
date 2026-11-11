@@ -57,7 +57,7 @@ export const hiddenTextRule: Rule = rule({
     INJECTION.lastIndex = 0;
     while ((m = INJECTION.exec(t))) {
       if (c.regions.some((r) => r.type === "hidden" && r.start <= m!.index && m!.index < r.end)) continue;
-      yield { start: m.index, end: m.index + m[0].length, repl: null, suggestions: [], note: "An instruction aimed at AI tools. It does not belong in a paper." };
+      yield { start: m.index, end: m.index + m[0].length, repl: null, suggestions: [], note: "Instruction-like language aimed at an AI tool. It may be a quoted example or research discussion; inspect the context before changing it. This match does not establish malicious intent or AI authorship." };
     }
   },
 });

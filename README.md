@@ -156,3 +156,17 @@ Changes compares against the opening baseline, including manual edits and edits 
 Word wording edits must fit inside one ordinary XML text node. Edits across runs, links, fields, tracked changes, and protected structure are skipped; unsafe exports stop with an explanation. This is conservative support, not a universal layout-preservation guarantee.
 
 Run `npm run build:site` then `npm run test:browser` for real-browser production/offline checks. Set `RESIDUE_CHROME` if Chrome/Chromium is not in a standard location. See `evaluation/README.md` for synthetic evaluation and optional manual paired-detector logging.
+
+## Academic pattern review
+
+Review-only checks now cover combinations of rhetorical patterns within a long
+paragraph, repeated full sentences, and vague attribution without a recognized
+nearby citation. Quotes, references, code, math and links are protected where
+recognized. Large scans run in a local background worker, including offline.
+
+These checks are experimental writing heuristics. They do not determine AI
+authorship, verify statistical watermarks, validate citations, or predict a
+Turnitin result. Invisible-character findings describe actual characters;
+ordinary punctuation and whitespace do not establish a text's origin.
+See [research and evaluation status](evaluation/pattern-research.md) for sources,
+limitations and the benchmark roadmap.

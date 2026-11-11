@@ -22,6 +22,8 @@ import { moderateSelection } from "../engine/bulk";
 import type { CleanupSelection, Change } from "../engine/types";
 import { journal, appliedRulesField, setAppliedRules, addApplied } from "./journal";
 import { editingPrompt } from "./handoff";
+import ScanWorker from "./scan.worker?worker&inline";
+import type { ScanResult } from "../engine/engine";
 
 export const bulkSelection = signal<CleanupSelection>(moderateSelection());
 export const bulkPreview = signal<{ before: string; result: CleanResult; docId: string } | null>(null);
@@ -144,14 +146,22 @@ export const tally = computed(() => {
 });
 
 let scanTimer: ReturnType<typeof setTimeout> | undefined;
+let scanGeneration = 0;
+let cancelScan: (() => void) | undefined;
+export const scanning = signal(false);
 export function scheduleScan(delay?: number) {
+  scanGeneration++;
+  cancelScan?.();
+  scanning.value = true;
   clearTimeout(scanTimer);
   const len = view?.state.doc.length ?? 0;
   scanTimer = setTimeout(runScan, delay ?? (len > 200_000 ? 450 : len > 50_000 ? 220 : 120));
 }
 
-function runScan() {
-  if (!view || !activeDoc.value) return;
+async function runScan() {
+  if (!view || !activeDoc.value) { scanning.value = false; return; }
+  const generation = scanGeneration;
+  const docId = activeDoc.value.id;
   const state = view.state;
   const text = state.doc.toString();
   const t0 = performance.now();
@@ -162,14 +172,39 @@ function runScan() {
         .map((h) => ({ type: "hidden" as const, start: dx.changes.mapPos(h.start, 1), end: dx.changes.mapPos(h.end, -1) }))
         .filter((h) => h.end > h.start)
     : [];
-  const res = scan(text, effectiveConfig(), extra);
-  scanMs.value = performance.now() - t0;
-  if (view.state.doc !== state.doc) { scheduleScan(); return; } // the user typed meanwhile
+  let res: ScanResult, profile: Stats;
+  try {
+    if (text.length >= 50000) {
+      const worker = new ScanWorker();
+      try {
+        const response = await new Promise<{ result: ScanResult; stats: Stats; ms: number }>((resolve, reject) => {
+          cancelScan = () => reject(new Error("superseded"));
+          worker.onmessage = (e) => e.data.error ? reject(new Error(e.data.error)) : resolve(e.data);
+          worker.onerror = () => reject(new Error("Background scan failed"));
+          worker.postMessage({ text, config: effectiveConfig(), extra });
+        });
+        res = response.result; profile = response.stats;
+        scanMs.value = response.ms;
+      } finally { worker.terminate(); }
+    } else {
+      res = scan(text, effectiveConfig(), extra);
+      profile = computeStats(text, res.findings);
+      scanMs.value = performance.now() - t0;
+    }
+  } catch {
+    if (generation === scanGeneration) {
+      scanning.value = false;
+      toastMsg("Scan could not finish. Edit the document or reopen it to retry.");
+    }
+    return;
+  } finally { if (generation === scanGeneration) cancelScan = undefined; }
+  if (generation !== scanGeneration || !view || activeDoc.value?.id !== docId || view.state.doc !== state.doc) return;
+  scanning.value = false;
   batch(() => {
     findings.value = res.findings;
     counts.value = res.counts;
     if (selectedId.value && !res.findings.some((f) => f.id === selectedId.value)) selectedId.value = null;
-    docStats.value = computeStats(text, res.findings);
+    docStats.value = profile;
   });
   view.dispatch({ effects: setFindings.of({ findings: res.findings, selected: selectedId.value }) });
   docVersion.value++;

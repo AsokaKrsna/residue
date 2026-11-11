@@ -7,6 +7,11 @@ Thank you for wanting to help. Small fixes are as welcome as big ones.
 - Report text that residue gets wrong. Paste a short sample and say what you expected.
 - Share new leftovers from AI tools that residue does not catch yet.
 - Fix a bug, improve a rule or make the wording clearer.
+- Multilingual support is future work and open to contributions. Include licensed
+  examples, provenance and cases that must remain unchanged.
+- Academic pattern checks need hard negatives as well as positive examples. See
+  [the evaluation roadmap](evaluation/pattern-research.md); do not present passing
+  synthetic tests as measured authorship-detection accuracy.
 
 ## Before you open a pull request
 

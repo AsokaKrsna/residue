@@ -8,7 +8,7 @@
   --sunk: #e4e8e6;
   --ink: #121614;
   --ink-2: #4a5350;
-  --ink-3: #858e8a;
+  --ink-3: #626c67;
   --line: #d3d9d6;
   --line-2: #e6e9e8;
   --accent: #0b7a5e;
@@ -35,7 +35,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0b0e0d; --pane: #111514; --surface: #161b19; --sunk: #0e1211;
-    --ink: #e3e9e6; --ink-2: #a2aca8; --ink-3: #6b7571; --line: #252c29; --line-2: #1c2220;
+    --ink: #e3e9e6; --ink-2: #a2aca8; --ink-3: #909b95; --line: #252c29; --line-2: #1c2220;
     --accent: #3dd6a3; --accent-ink: #05130e; --accent-soft: rgba(61, 214, 163, 0.14);
     --rm: #ff7b6b; --rm-bg: rgba(255, 123, 107, 0.14); --rp: #f2b84b; --rp-bg: rgba(242, 184, 75, 0.15);
     --rv: #b39bff; --rv-bg: rgba(179, 155, 255, 0.15);
@@ -46,7 +46,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #0b0e0d; --pane: #111514; --surface: #161b19; --sunk: #0e1211;
-  --ink: #e3e9e6; --ink-2: #a2aca8; --ink-3: #6b7571; --line: #252c29; --line-2: #1c2220;
+  --ink: #e3e9e6; --ink-2: #a2aca8; --ink-3: #909b95; --line: #252c29; --line-2: #1c2220;
   --accent: #3dd6a3; --accent-ink: #05130e; --accent-soft: rgba(61, 214, 163, 0.14);
   --rm: #ff7b6b; --rm-bg: rgba(255, 123, 107, 0.14); --rp: #f2b84b; --rp-bg: rgba(242, 184, 75, 0.15);
   --rv: #b39bff; --rv-bg: rgba(179, 155, 255, 0.15);
@@ -137,7 +137,11 @@ input[type="search"] { background: var(--surface); border: 1px solid var(--line)
 
 /* rules */
 .group { border-bottom: 1px solid var(--line); }
-.ghead { display: flex; align-items: center; gap: 8px; padding: 10px 14px 4px; cursor: pointer; user-select: none; }
+.ghead { display: flex; align-items: center; gap: 8px; padding: 4px 14px; user-select: none; }
+.group-toggle { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-align: left; padding: 8px 0; border: 0; background: none; cursor: pointer; }
+.group-toggle:hover { color: var(--accent); }
+.preset-control, .file-type-control { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); white-space: nowrap; }
+.preset-control { font-size: 12px; }
 .ghead .gname { font-weight: 600; font-size: 12.5px; flex: 1; }
 .ghead .chev { color: var(--ink-3); transition: transform 0.15s; font-size: 10px; }
 .group.collapsed .chev { transform: rotate(-90deg); }
@@ -186,10 +190,10 @@ input[type="search"] { background: var(--surface); border: 1px solid var(--line)
 .cm-scroller { font-family: var(--mono); line-height: 1.7; }
 .cm-content { padding: 14px 0 40vh; caret-color: var(--accent); }
 .cm-line { padding: 0 24px 0 12px; }
-.cm-gutters { background: var(--surface); border-right: 1px solid var(--line-2); color: var(--ink-3); font-size: 11px; }
+.cm-editor .cm-gutters { background: var(--surface); border-right: 1px solid var(--line-2); color: var(--ink-2); font-size: 11px; }
 .cm-lineNumbers .cm-gutterElement { padding: 0 10px 0 14px; }
-.cm-activeLine { background: color-mix(in srgb, var(--ink) 3.5%, transparent); }
-.cm-activeLineGutter { background: transparent; color: var(--ink); }
+.cm-editor .cm-activeLine { background: color-mix(in srgb, var(--ink) 3.5%, transparent); }
+.cm-editor .cm-activeLineGutter { background: var(--accent-soft); color: var(--ink); }
 .cm-cursor { border-left: 2px solid var(--accent); }
 .cm-selectionBackground, .cm-focused .cm-selectionBackground, ::selection { background: color-mix(in srgb, var(--accent) 22%, transparent) !important; }
 .cm-searchMatch { background: var(--rp-bg); outline: 1px solid var(--rp); }

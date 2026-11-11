@@ -153,8 +153,20 @@ export function scanMarkdown(t: string): Region[] {
   // YAML front matter
   const fm = /^---\n[\s\S]*?\n---\n/.exec(t);
   if (fm) add(out, "verbatim", 0, fm[0].length);
+  // CommonMark fences: 0–3 spaces, 3+ identical markers, closing run at least
+  // as long as the opener. An unclosed fence protects through EOF.
+  const lines = [...t.matchAll(/[^\n]*(?:\n|$)/g)].filter((m) => m[0].length);
+  for (let i = 0; i < lines.length; i++) {
+    const opening = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)\r?\n?$/.exec(lines[i][0]);
+    if (!opening || (opening[1][0] === "`" && opening[2].includes("`"))) continue;
+    const start = lines[i].index;
+    const close = new RegExp(`^ {0,3}${opening[1][0]}{${opening[1].length},}[ \\t]*\\r?\\n?$`);
+    let j = i + 1;
+    while (j < lines.length && !close.test(lines[j][0])) j++;
+    add(out, "verbatim", start, j < lines.length ? lines[j].index + lines[j][0].length : t.length);
+    i = j;
+  }
   const patterns: [RegExp, RegionType][] = [
-    [/^(```|~~~)[^\n]*\n[\s\S]*?(?:^\1[ \t]*$|(?![\s\S]))/gm, "verbatim"],
     [/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g, "verbatim"],
     [/<!--[\s\S]*?-->/g, "comment"],
     [/\$\$[\s\S]+?\$\$/g, "math"],
@@ -251,6 +263,13 @@ export class RegionIndex {
 /** Additional guards for prose edits, regardless of the selected format guards. */
 export function wordingRegions(text: string): Region[] {
   const regions = [...scanTex(text), ...scanMarkdown(text), ...scanUrls(text)];
+  // Conventional reference sections are evidence, not prose to rewrite.
+  const references = /^(?:#{1,6}[ \t]+)?(?:References|Bibliography)[ \t]*\r?$/gim;
+  for (const m of text.matchAll(references)) {
+    const rest = text.slice(m.index + m[0].length);
+    const nextHeading = /^#{1,6}[ \t]+/m.exec(rest);
+    regions.push({ type: "keys", start: m.index, end: nextHeading ? m.index + m[0].length + nextHeading.index : text.length });
+  }
   const patterns = [
     /!?\[[^\]\n]*\](?:\([^\n)]*\)|\[[^\]\n]*\])|\\(?:href|hyperlink)\{[^}\n]*\}\{[^}\n]*\}/g,
     /"(?:\\.|[^"\\])*"|\u201C[^\u201D]*\u201D|\u2018[^\u2019]*\u2019|(?<!\w)'[^'\n]+'(?!\w)|``[\s\S]*?''/g,

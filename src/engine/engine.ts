@@ -91,7 +91,7 @@ export function scan(text: string, cfg: Config, extra: Region[] = []): ScanResul
     const push = (mt: Match) => {
       if (mt.end < mt.start) return;
       if (rule.scope === "text" && prot.intersects(mt.start, mt.end)) return;
-      if (rule.bulk === "wording" && wording.intersects(mt.start, mt.end)) return;
+      if ((rule.bulk === "wording" || rule.group === "sty") && wording.intersects(mt.start, mt.end)) return;
       if (rule.scope === "math" && !ctx.inMath(mt.start)) return;
       const orig = text.slice(mt.start, mt.end);
       if (mt.repl === orig) return;
@@ -151,7 +151,10 @@ const RULE_ORDER: Record<string, number> = Object.fromEntries(RULES.map((r, i) =
  */
 function resolve(all: Finding[]): Finding[] {
   const order = (a: Finding, b: Finding) =>
-    a.start - b.start || (b.end - b.start) - (a.end - a.start) || RULE_ORDER[a.ruleId] - RULE_ORDER[b.ruleId];
+    a.start - b.start ||
+    // At the same anchor, keep contextual evidence over a single phrase hint.
+    Number(b.ruleId === "sty.cluster") - Number(a.ruleId === "sty.cluster") ||
+    (b.end - b.start) - (a.end - a.start) || RULE_ORDER[a.ruleId] - RULE_ORDER[b.ruleId];
   all.sort(order);
   const fixes: Finding[] = [];
   const reviews: Finding[] = [];

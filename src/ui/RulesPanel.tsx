@@ -11,7 +11,7 @@ function ruleKind(id: string): Kind | null {
 export function RulesPanel() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => Object.fromEntries(GROUPS.map((g) => [g.id, true])));
   const cfg = config.value;
   const ft = activeDoc.value?.fileType ?? "tex";
   const query = q.trim().toLowerCase();
@@ -32,10 +32,13 @@ export function RulesPanel() {
         const isCollapsed = collapsed[g.id] && !query;
         return (
           <section class={`group${isCollapsed ? " collapsed" : ""}`} key={g.id}>
-            <div class="ghead" onClick={() => setCollapsed({ ...collapsed, [g.id]: !collapsed[g.id] })}>
+            <div class="ghead">
+              <button class="group-toggle" aria-expanded={!isCollapsed} aria-controls={`rules-${g.id}`}
+                onClick={() => setCollapsed({ ...collapsed, [g.id]: !collapsed[g.id] })}>
               <span class="chev" aria-hidden="true">{"▾"}</span>
               <span class="gname">{g.name}</span>
               {n > 0 && <span class="mono num" style={{ fontSize: "11px", color: "var(--ink-2)" }}>{n}</span>}
+              </button>
               <button
                 class={`sw${ons && ons < rs.length ? " mixed" : ""}`}
                 role="switch"
@@ -45,7 +48,7 @@ export function RulesPanel() {
               />
             </div>
             {!isCollapsed && <div class="gblurb">{g.blurb}</div>}
-            <div class="rulelist">
+            <div class="rulelist" id={`rules-${g.id}`} hidden={!!isCollapsed}>
               {rs.map((r) => {
                 const on = !!cfg.enabled[r.id];
                 const c = r.guard ? null : counts.value[r.id] ?? 0;
